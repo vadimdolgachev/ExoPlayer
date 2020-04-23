@@ -126,6 +126,7 @@ public final class PesReader implements TsPayloadReader {
           // Read as much of the extended header as we're interested in, and skip the rest.
           if (continueRead(data, pesScratch.data, readLength)
               && continueRead(data, /* target= */ null, extendedHeaderLength)) {
+//            pts read
             parseHeaderExtension();
             flags |= dataAlignmentIndicator ? FLAG_DATA_ALIGNMENT_INDICATOR : 0;
             reader.packetStarted(timeUs, flags);

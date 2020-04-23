@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.extractor.ts;
 
 import static com.google.android.exoplayer2.extractor.ts.TsPayloadReader.FLAG_PAYLOAD_UNIT_START_INDICATOR;
 
+import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
@@ -303,6 +304,7 @@ public final class TsExtractor implements Extractor {
     boolean payloadExists = (tsPacketHeader & 0x10) != 0;
 
     TsPayloadReader payloadReader = payloadExists ? tsPayloadReaders.get(pid) : null;
+    Log.d("TsExtractor", "pid: " + pid);
     if (payloadReader == null) {
       tsPacketBuffer.setPosition(endOfPacket);
       return RESULT_CONTINUE;

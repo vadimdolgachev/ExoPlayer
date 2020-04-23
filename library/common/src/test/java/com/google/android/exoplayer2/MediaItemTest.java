@@ -142,6 +142,14 @@ public class MediaItemTest {
   }
 
   @Test
+  public void builderSetCustomCacheKey_setsCustomCacheKey() {
+    MediaItem mediaItem =
+        new MediaItem.Builder().setSourceUri(URI_STRING).setCustomCacheKey("key").build();
+
+    assertThat(mediaItem.playbackProperties.customCacheKey).isEqualTo("key");
+  }
+
+  @Test
   public void builderSetStreamKeys_setsStreamKeys() {
     List<StreamKey> streamKeys = new ArrayList<>();
     streamKeys.add(new StreamKey(1, 0, 0));
@@ -259,6 +267,16 @@ public class MediaItemTest {
   }
 
   @Test
+  public void builderSetAdTagUri_setsAdTagUri() {
+    Uri adTagUri = Uri.parse(URI_STRING + "/ad");
+
+    MediaItem mediaItem =
+        new MediaItem.Builder().setSourceUri(URI_STRING).setAdTagUri(adTagUri).build();
+
+    assertThat(mediaItem.playbackProperties.adTagUri).isEqualTo(adTagUri);
+  }
+
+  @Test
   public void builderSetMediaMetadata_setsMetadata() {
     MediaMetadata mediaMetadata = new MediaMetadata.Builder().setTitle("title").build();
 
@@ -266,5 +284,42 @@ public class MediaItemTest {
         new MediaItem.Builder().setSourceUri(URI_STRING).setMediaMetadata(mediaMetadata).build();
 
     assertThat(mediaItem.mediaMetadata).isEqualTo(mediaMetadata);
+  }
+
+  @Test
+  public void buildUpon_equalsToOriginal() {
+    MediaItem mediaItem =
+        new MediaItem.Builder()
+            .setAdTagUri(URI_STRING)
+            .setClipEndPositionMs(1000)
+            .setClipRelativeToDefaultPosition(true)
+            .setClipRelativeToLiveWindow(true)
+            .setClipStartPositionMs(100)
+            .setClipStartsAtKeyFrame(true)
+            .setCustomCacheKey("key")
+            .setDrmUuid(C.WIDEVINE_UUID)
+            .setDrmLicenseUri(URI_STRING + "/license")
+            .setDrmLicenseRequestHeaders(
+                Collections.singletonMap("Referer", "http://www.google.com"))
+            .setDrmMultiSession(true)
+            .setDrmPlayClearContentWithoutKey(true)
+            .setDrmSessionForClearTypes(Collections.singletonList(C.TRACK_TYPE_AUDIO))
+            .setMediaId("mediaId")
+            .setMediaMetadata(new MediaMetadata.Builder().setTitle("title").build())
+            .setMimeType(MimeTypes.APPLICATION_MP4)
+            .setSourceUri(URI_STRING)
+            .setStreamKeys(Collections.singletonList(new StreamKey(1, 0, 0)))
+            .setSubtitles(
+                Collections.singletonList(
+                    new MediaItem.Subtitle(
+                        Uri.parse(URI_STRING + "/en"),
+                        MimeTypes.APPLICATION_TTML,
+                        /* language= */ "en")))
+            .setTag(new Object())
+            .build();
+
+    MediaItem copy = mediaItem.buildUpon().build();
+
+    assertThat(copy).isEqualTo(mediaItem);
   }
 }

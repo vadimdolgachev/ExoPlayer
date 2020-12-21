@@ -158,12 +158,13 @@ public final class Ac3Util {
    *
    * @param data The AC3SpecificBox to parse.
    * @param trackId The track identifier to set on the format.
+   * @param trackName The name to set on the format.
    * @param language The language to set on the format.
    * @param drmInitData {@link DrmInitData} to be included in the format.
    * @return The AC-3 format parsed from data in the header.
    */
   public static Format parseAc3AnnexFFormat(
-      ParsableByteArray data, String trackId, String language, @Nullable DrmInitData drmInitData) {
+      ParsableByteArray data, String trackId, @Nullable String trackName, String language, @Nullable DrmInitData drmInitData) {
     int fscod = (data.readUnsignedByte() & 0xC0) >> 6;
     int sampleRate = SAMPLE_RATE_BY_FSCOD[fscod];
     int nextByte = data.readUnsignedByte();
@@ -173,6 +174,7 @@ public final class Ac3Util {
     }
     return new Format.Builder()
         .setId(trackId)
+        .setLabel(trackName)
         .setSampleMimeType(MimeTypes.AUDIO_AC3)
         .setChannelCount(channelCount)
         .setSampleRate(sampleRate)
@@ -187,12 +189,13 @@ public final class Ac3Util {
    *
    * @param data The EC3SpecificBox to parse.
    * @param trackId The track identifier to set on the format.
+   * @param trackName The name to set on the format.
    * @param language The language to set on the format.
    * @param drmInitData {@link DrmInitData} to be included in the format.
    * @return The E-AC-3 format parsed from data in the header.
    */
   public static Format parseEAc3AnnexFFormat(
-      ParsableByteArray data, String trackId, String language, @Nullable DrmInitData drmInitData) {
+      ParsableByteArray data, String trackId, @Nullable String trackName, String language, @Nullable DrmInitData drmInitData) {
     data.skipBytes(2); // data_rate, num_ind_sub
 
     // Read the first independent substream.
@@ -224,6 +227,7 @@ public final class Ac3Util {
     }
     return new Format.Builder()
         .setId(trackId)
+        .setLabel(trackName)
         .setSampleMimeType(mimeType)
         .setChannelCount(channelCount)
         .setSampleRate(sampleRate)

@@ -252,7 +252,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     if (trackType == C.TRACK_TYPE_UNKNOWN) {
       return null;
     }
-
+    @Nullable String trackName = null;
+    @Nullable Atom.LeafAtom udta = trak.getLeafAtomOfType(Atom.TYPE_udta);
+    if (udta != null) {
+      trackName = AtomParsers.parseTrackName(udta.data);
+    }
     TkhdData tkhdData = parseTkhd(checkNotNull(trak.getLeafAtomOfType(Atom.TYPE_tkhd)).data);
     if (duration == C.TIME_UNSET) {
       duration = tkhdData.duration;
@@ -275,6 +279,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         parseStsd(
             checkNotNull(stbl.getLeafAtomOfType(Atom.TYPE_stsd)).data,
             tkhdData.id,
+            trackName,
             tkhdData.rotationDegrees,
             mdhdData.second,
             drmInitData,
@@ -828,6 +833,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
    *
    * @param stsd The stsd atom to decode.
    * @param trackId The track's identifier in its container.
+   * @param trackName The name of the track.
    * @param rotationDegrees The rotation of the track in degrees.
    * @param language The language of the track.
    * @param drmInitData {@link DrmInitData} to be included in the format, or {@code null}.
@@ -837,6 +843,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
   private static StsdData parseStsd(
       ParsableByteArray stsd,
       int trackId,
+      @Nullable String trackName,
       int rotationDegrees,
       String language,
       @Nullable DrmInitData drmInitData,
@@ -888,12 +895,12 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
           || childAtomType == Atom.TYPE_ulaw
           || childAtomType == Atom.TYPE_Opus
           || childAtomType == Atom.TYPE_fLaC) {
-        parseAudioSampleEntry(stsd, childAtomType, childStartPosition, childAtomSize, trackId,
+        parseAudioSampleEntry(stsd, childAtomType, childStartPosition, childAtomSize, trackId, trackName,
             language, isQuickTime, drmInitData, out, i);
       } else if (childAtomType == Atom.TYPE_TTML || childAtomType == Atom.TYPE_tx3g
           || childAtomType == Atom.TYPE_wvtt || childAtomType == Atom.TYPE_stpp
           || childAtomType == Atom.TYPE_c608) {
-        parseTextSampleEntry(stsd, childAtomType, childStartPosition, childAtomSize, trackId,
+        parseTextSampleEntry(stsd, childAtomType, childStartPosition, childAtomSize, trackId, trackName,
             language, out);
       } else if (childAtomType == Atom.TYPE_mett) {
         parseMetaDataSampleEntry(stsd, childAtomType, childStartPosition, trackId, out);
@@ -915,6 +922,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       int position,
       int atomSize,
       int trackId,
+      @Nullable String trackName,
       String language,
       StsdData out) {
     parent.setPosition(position + Atom.HEADER_SIZE + StsdData.STSD_HEADER_SIZE);
@@ -949,6 +957,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
     out.format =
         new Format.Builder()
             .setId(trackId)
+            .setLabel(trackName)
             .setSampleMimeType(mimeType)
             .setLanguage(language)
             .setSubsampleOffsetUs(subsampleOffsetUs)
@@ -1166,6 +1175,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       int position,
       int size,
       int trackId,
+      @Nullable String trackName,
       String language,
       boolean isQuickTime,
       @Nullable DrmInitData drmInitData,
@@ -1293,20 +1303,21 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
         }
       } else if (childAtomType == Atom.TYPE_dac3) {
         parent.setPosition(Atom.HEADER_SIZE + childPosition);
-        out.format = Ac3Util.parseAc3AnnexFFormat(parent, Integer.toString(trackId), language,
+        out.format = Ac3Util.parseAc3AnnexFFormat(parent, Integer.toString(trackId), trackName, language,
             drmInitData);
       } else if (childAtomType == Atom.TYPE_dec3) {
         parent.setPosition(Atom.HEADER_SIZE + childPosition);
-        out.format = Ac3Util.parseEAc3AnnexFFormat(parent, Integer.toString(trackId), language,
+        out.format = Ac3Util.parseEAc3AnnexFFormat(parent, Integer.toString(trackId), trackName, language,
             drmInitData);
       } else if (childAtomType == Atom.TYPE_dac4) {
         parent.setPosition(Atom.HEADER_SIZE + childPosition);
         out.format =
-            Ac4Util.parseAc4AnnexEFormat(parent, Integer.toString(trackId), language, drmInitData);
+            Ac4Util.parseAc4AnnexEFormat(parent, Integer.toString(trackId), trackName, language, drmInitData);
       } else if (childAtomType == Atom.TYPE_ddts) {
         out.format =
             new Format.Builder()
                 .setId(trackId)
+                .setLabel(trackName)
                 .setSampleMimeType(mimeType)
                 .setChannelCount(channelCount)
                 .setSampleRate(sampleRate)
@@ -1351,6 +1362,7 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       out.format =
           new Format.Builder()
               .setId(trackId)
+              .setLabel(trackName)
               .setSampleMimeType(mimeType)
               .setCodecs(codecs)
               .setChannelCount(channelCount)
@@ -1557,6 +1569,25 @@ import org.checkerframework.checker.nullness.compatqual.NullableType;
       size = (size << 7) | (currentByte & 0x7F);
     }
     return size;
+  }
+
+  /**
+   * Parses a track name.
+   *
+   * @param udtaData The udta (user data) of trak atom.
+   * @return Name of track, or null.
+   */
+  @Nullable
+  private static String parseTrackName(ParsableByteArray udtaData) {
+    udtaData.setPosition(Atom.HEADER_SIZE);
+    if (udtaData.bytesLeft() >= Atom.HEADER_SIZE) {
+      int atomSize = udtaData.readInt();
+      int type = udtaData.readInt();
+      if ("name".equals(Atom.getAtomTypeString(type))) {
+        return udtaData.readNullTerminatedString(atomSize - Atom.HEADER_SIZE);
+      }
+    }
+    return null;
   }
 
   /** Returns whether it's possible to apply the specified edit using gapless playback info. */

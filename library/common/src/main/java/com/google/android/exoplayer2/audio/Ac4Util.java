@@ -99,16 +99,18 @@ public final class Ac4Util {
    *
    * @param data The AC4SpecificBox to parse.
    * @param trackId The track identifier to set on the format.
+   * @param trackName The name to set on the format.
    * @param language The language to set on the format.
    * @param drmInitData {@link DrmInitData} to be included in the format.
    * @return The AC-4 format parsed from data in the header.
    */
   public static Format parseAc4AnnexEFormat(
-      ParsableByteArray data, String trackId, String language, @Nullable DrmInitData drmInitData) {
+      ParsableByteArray data, String trackId, @Nullable String trackName, String language, @Nullable DrmInitData drmInitData) {
     data.skipBytes(1); // ac4_dsi_version, bitstream_version[0:5]
     int sampleRate = ((data.readUnsignedByte() & 0x20) >> 5 == 1) ? 48000 : 44100;
     return new Format.Builder()
         .setId(trackId)
+        .setLabel(trackName)
         .setSampleMimeType(MimeTypes.AUDIO_AC4)
         .setChannelCount(CHANNEL_COUNT_2)
         .setSampleRate(sampleRate)

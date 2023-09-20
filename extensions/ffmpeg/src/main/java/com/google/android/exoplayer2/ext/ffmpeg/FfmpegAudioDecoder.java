@@ -116,11 +116,9 @@ import java.util.List;
     int result;
 
     if (FfmpegAudioRenderer.shouldUseBypass(codecName, channelCount) && supportsBypass) {
-      Log.d("FfmpegAudioDecoder", "decode: bypass");
       outputData.put(inputData);
       result = inputSize;
     } else {
-      Log.d("FfmpegAudioDecoder", "decode: ffmpeg");
       result = ffmpegDecode(nativeContext, inputData, inputSize, outputData, outputBufferSize);
     }
     if (result == AUDIO_DECODER_ERROR_OTHER) {

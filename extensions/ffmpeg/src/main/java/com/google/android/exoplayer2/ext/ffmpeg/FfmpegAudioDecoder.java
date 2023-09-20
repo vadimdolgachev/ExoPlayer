@@ -66,7 +66,8 @@ import java.util.List;
     encoding = outputFloat ? C.ENCODING_PCM_FLOAT : C.ENCODING_PCM_16BIT;
     outputBufferSize = outputFloat ? OUTPUT_BUFFER_SIZE_32BIT : OUTPUT_BUFFER_SIZE_16BIT;
     nativeContext =
-        ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount);
+            ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount,
+                    FfmpegAudioRenderer.isNeedTranscodingToAc3(codecName, format.channelCount));
     if (nativeContext == 0) {
       throw new FfmpegDecoderException("Initialization failed.");
     }
@@ -212,13 +213,17 @@ import java.util.List;
     System.arraycopy(header1, 0, extraData, header0.length + 6, header1.length);
     return extraData;
   }
+  public String getCodecName() {
+    return codecName;
+  }
 
   private native long ffmpegInitialize(
       String codecName,
       @Nullable byte[] extraData,
       boolean outputFloat,
       int rawSampleRate,
-      int rawChannelCount);
+      int rawChannelCount,
+      boolean isNeedTranscodingToAc3);
 
   private native int ffmpegDecode(
       long context, ByteBuffer inputData, int inputSize, ByteBuffer outputData, int outputSize);

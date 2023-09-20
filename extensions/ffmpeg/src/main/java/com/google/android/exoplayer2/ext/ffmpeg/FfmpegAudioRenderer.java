@@ -126,12 +126,21 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   @Override
   protected Format getOutputFormat(FfmpegAudioDecoder decoder) {
     Assertions.checkNotNull(decoder);
-    return new Format.Builder()
-        .setSampleMimeType(MimeTypes.AUDIO_RAW)
-        .setChannelCount(decoder.getChannelCount())
-        .setSampleRate(decoder.getSampleRate())
-        .setPcmEncoding(decoder.getEncoding())
-        .build();
+    if (isNeedTranscodingToAc3(decoder.getCodecName(), decoder.getChannelCount())) {
+      return new Format.Builder()
+              .setSampleMimeType(MimeTypes.AUDIO_AC3)
+              .setChannelCount(decoder.getChannelCount())
+              .setSampleRate(decoder.getSampleRate())
+              .setCodecs("audio/ac3")
+              .build();
+    } else {
+      return new Format.Builder()
+              .setSampleMimeType(MimeTypes.AUDIO_RAW)
+              .setChannelCount(decoder.getChannelCount())
+              .setSampleRate(decoder.getSampleRate())
+              .setPcmEncoding(decoder.getEncoding())
+              .build();
+    }
   }
 
   /**
@@ -165,5 +174,9 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
         // Always prefer 16-bit PCM if the sink does not provide direct support for floating point.
         return false;
     }
+  }
+
+  public static boolean isNeedTranscodingToAc3(String codecName, int channelCount) {
+    return "aac".equals(codecName) && channelCount >= 6;
   }
 }

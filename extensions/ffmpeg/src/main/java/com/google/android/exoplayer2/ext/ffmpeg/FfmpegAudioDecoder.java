@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.ext.ffmpeg;
 
+import android.util.Log;
+
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -43,6 +45,7 @@ import java.util.List;
   @Nullable private final byte[] extraData;
   private final @C.PcmEncoding int encoding;
   private final int outputBufferSize;
+  private final boolean supportsBypass;
 
   private long nativeContext; // May be reassigned on resetting the codec.
   private boolean hasOutputFormat;
@@ -50,11 +53,11 @@ import java.util.List;
   private volatile int sampleRate;
 
   public FfmpegAudioDecoder(
-      Format format,
-      int numInputBuffers,
-      int numOutputBuffers,
-      int initialInputBufferSize,
-      boolean outputFloat)
+          Format format,
+          int numInputBuffers,
+          int numOutputBuffers,
+          int initialInputBufferSize,
+          boolean outputFloat, boolean supportsBypass)
       throws FfmpegDecoderException {
     super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);
     if (!FfmpegLibrary.isAvailable()) {
@@ -67,7 +70,8 @@ import java.util.List;
     outputBufferSize = outputFloat ? OUTPUT_BUFFER_SIZE_32BIT : OUTPUT_BUFFER_SIZE_16BIT;
     nativeContext =
             ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount,
-                    FfmpegAudioRenderer.isNeedTranscodingToAc3(codecName, format.channelCount));
+                    FfmpegAudioRenderer.shouldUseTranscodingToAc3(codecName, format.channelCount));
+    this.supportsBypass = supportsBypass;
     if (nativeContext == 0) {
       throw new FfmpegDecoderException("Initialization failed.");
     }
@@ -109,7 +113,16 @@ import java.util.List;
     ByteBuffer inputData = Util.castNonNull(inputBuffer.data);
     int inputSize = inputData.limit();
     ByteBuffer outputData = outputBuffer.init(inputBuffer.timeUs, outputBufferSize);
-    int result = ffmpegDecode(nativeContext, inputData, inputSize, outputData, outputBufferSize);
+    int result;
+
+    if (FfmpegAudioRenderer.shouldUseBypass(codecName, channelCount) && supportsBypass) {
+      Log.d("FfmpegAudioDecoder", "decode: bypass");
+      outputData.put(inputData);
+      result = inputSize;
+    } else {
+      Log.d("FfmpegAudioDecoder", "decode: ffmpeg");
+      result = ffmpegDecode(nativeContext, inputData, inputSize, outputData, outputBufferSize);
+    }
     if (result == AUDIO_DECODER_ERROR_OTHER) {
       return new FfmpegDecoderException("Error decoding (see logcat).");
     } else if (result == AUDIO_DECODER_ERROR_INVALID_DATA) {

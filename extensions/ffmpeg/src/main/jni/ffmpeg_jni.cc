@@ -71,7 +71,7 @@ static const int AUDIO_DECODER_ERROR_OTHER = -2;
 
 static AVCodecContext *ac3CodecCxt = nullptr;
 static AVAudioFifo *audioFifo = nullptr;
-static bool isNeedTranscodingToAc3 = false;
+static bool shouldUseTranscodingToAc3 = false;
 
 /**
  * Returns the AVCodec with the specified name, or NULL if it is not available.
@@ -135,7 +135,7 @@ AUDIO_DECODER_FUNC(jlong, ffmpegInitialize, jstring codecName,
                    jbyteArray extraData, jboolean outputFloat,
                    jint rawSampleRate, jint rawChannelCount,
                    jboolean transodToAc3) {
-  isNeedTranscodingToAc3 = transodToAc3;
+  shouldUseTranscodingToAc3 = transodToAc3;
   AVCodec *codec = getCodecByName(env, codecName);
   if (!codec) {
     LOGE("Codec not found.");
@@ -190,6 +190,10 @@ AUDIO_DECODER_FUNC(jint, ffmpegGetSampleRate, jlong context) {
 }
 
 AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
+  LOGE("ffmpegReset");
+  if (audioFifo != nullptr) {
+    av_audio_fifo_reset(audioFifo);
+  }
   AVCodecContext *context = (AVCodecContext *)jContext;
   if (!context) {
     LOGE("Tried to reset without a context.");
@@ -218,8 +222,10 @@ AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
 }
 
 AUDIO_DECODER_FUNC(void, ffmpegRelease, jlong context) {
+  LOGE("ffmpegRelease");
   if (audioFifo != nullptr) {
     av_audio_fifo_free(audioFifo);
+    audioFifo = nullptr;
   }
   if (ac3CodecCxt != nullptr) {
     avcodec_free_context(&ac3CodecCxt);
@@ -249,7 +255,7 @@ AVCodecContext *createContext(JNIEnv *env, AVCodec *codec, jbyteArray extraData,
   }
   context->request_sample_fmt =
       outputFloat ? OUTPUT_FORMAT_PCM_FLOAT : OUTPUT_FORMAT_PCM_16BIT;
-  if (isNeedTranscodingToAc3) {
+  if (shouldUseTranscodingToAc3) {
     AVCodec *ac3Codec = avcodec_find_encoder(AV_CODEC_ID_AC3);
     if (ac3Codec != nullptr && ac3Codec->sample_fmts != nullptr) {
       ac3CodecCxt = avcodec_alloc_context3(ac3Codec);
@@ -362,7 +368,7 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
       return AUDIO_DECODER_ERROR_INVALID_DATA;
     }
 
-    if (isNeedTranscodingToAc3) {
+    if (shouldUseTranscodingToAc3) {
       av_samples_alloc_array_and_samples(&pcmBuffer,
                                          nullptr,
                                          channelCount,
@@ -387,7 +393,7 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
       return AUDIO_DECODER_ERROR_INVALID_DATA;
     }
 
-    if (isNeedTranscodingToAc3) {
+    if (shouldUseTranscodingToAc3) {
       if (audioFifo == nullptr) {
         audioFifo = av_audio_fifo_alloc(context->request_sample_fmt,
                                         context->channels,
@@ -407,7 +413,7 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
   }
   AVFrame *ac3Frame = nullptr;
   AVPacket *ac3Packet = nullptr;
-  if (isNeedTranscodingToAc3 && audioFifo != nullptr) {
+  if (shouldUseTranscodingToAc3 && audioFifo != nullptr) {
     ac3Frame = av_frame_alloc();
     ac3Frame->nb_samples = ac3CodecCxt->frame_size;
     ac3Frame->channels = ac3CodecCxt->channels;

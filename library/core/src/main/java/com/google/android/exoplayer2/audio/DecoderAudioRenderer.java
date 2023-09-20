@@ -232,6 +232,10 @@ public abstract class DecoderAudioRenderer<
     this.experimentalKeepAudioTrackOnSeek = enableKeepAudioTrackOnSeek;
   }
 
+  public boolean supportsBypass(Format format) {
+    return audioSink.supportsFormat(format);
+  }
+
   @Override
   @Nullable
   public MediaClock getMediaClock() {
@@ -820,6 +824,10 @@ public abstract class DecoderAudioRenderer<
               : max(currentPositionUs, newCurrentPositionUs);
       allowPositionDiscontinuity = false;
     }
+  }
+
+  protected Format getInputFormat() {
+    return inputFormat;
   }
 
   private final class AudioSinkListener implements AudioSink.Listener {

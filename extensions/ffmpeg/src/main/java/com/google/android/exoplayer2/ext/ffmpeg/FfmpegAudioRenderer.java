@@ -117,7 +117,7 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
         format.maxInputSize != Format.NO_VALUE ? format.maxInputSize : DEFAULT_INPUT_BUFFER_SIZE;
     FfmpegAudioDecoder decoder =
         new FfmpegAudioDecoder(
-            format, NUM_BUFFERS, NUM_BUFFERS, initialInputBufferSize, shouldOutputFloat(format));
+            format, NUM_BUFFERS, NUM_BUFFERS, initialInputBufferSize, shouldOutputFloat(format), supportsBypass(format));
     TraceUtil.endSection();
     return decoder;
   }
@@ -126,7 +126,8 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   @Override
   protected Format getOutputFormat(FfmpegAudioDecoder decoder) {
     Assertions.checkNotNull(decoder);
-    if (isNeedTranscodingToAc3(decoder.getCodecName(), decoder.getChannelCount())) {
+    if (shouldUseTranscodingToAc3(decoder.getCodecName(), decoder.getChannelCount())
+      || (shouldUseBypass(decoder.getCodecName(), decoder.getChannelCount()) && supportsBypass(getInputFormat()))) {
       return new Format.Builder()
               .setSampleMimeType(MimeTypes.AUDIO_AC3)
               .setChannelCount(decoder.getChannelCount())
@@ -176,7 +177,11 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     }
   }
 
-  public static boolean isNeedTranscodingToAc3(String codecName, int channelCount) {
+  public static boolean shouldUseTranscodingToAc3(String codecName, int channelCount) {
     return "aac".equals(codecName) && channelCount >= 6;
+  }
+
+  public static boolean shouldUseBypass(String codecName, int channelCount) {
+    return "ac3".equals(codecName) && channelCount >= 6;
   }
 }

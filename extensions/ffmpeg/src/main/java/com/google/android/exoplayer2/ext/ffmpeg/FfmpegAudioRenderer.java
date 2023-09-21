@@ -132,7 +132,6 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
               .setSampleMimeType(MimeTypes.AUDIO_AC3)
               .setChannelCount(decoder.getChannelCount())
               .setSampleRate(decoder.getSampleRate())
-              .setCodecs("audio/ac3")
               .build();
     } else {
       return new Format.Builder()

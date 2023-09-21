@@ -15,8 +15,6 @@
  */
 package com.google.android.exoplayer2.ext.ffmpeg;
 
-import android.util.Log;
-
 import androidx.annotation.Nullable;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -53,11 +51,12 @@ import java.util.List;
   private volatile int sampleRate;
 
   public FfmpegAudioDecoder(
-          Format format,
-          int numInputBuffers,
-          int numOutputBuffers,
-          int initialInputBufferSize,
-          boolean outputFloat, boolean supportsBypass)
+      Format format,
+      int numInputBuffers,
+      int numOutputBuffers,
+      int initialInputBufferSize,
+      boolean outputFloat,
+      boolean supportsBypass)
       throws FfmpegDecoderException {
     super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);
     if (!FfmpegLibrary.isAvailable()) {

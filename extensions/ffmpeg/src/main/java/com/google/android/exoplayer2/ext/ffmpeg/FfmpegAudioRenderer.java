@@ -126,8 +126,8 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   @Override
   protected Format getOutputFormat(FfmpegAudioDecoder decoder) {
     Assertions.checkNotNull(decoder);
-    if (shouldUseTranscodingToAc3(decoder.getCodecName(), decoder.getChannelCount())
-      || (shouldUseBypass(decoder.getCodecName(), decoder.getChannelCount()) && supportsBypass(getInputFormat()))) {
+    if ((shouldUseTranscodingToAc3(decoder.getCodecName(), decoder.getChannelCount()) && supportsBypass(getInputFormat()))
+            || shouldUseBypass(decoder.getCodecName(), decoder.getChannelCount()) && supportsBypass(getInputFormat())) {
       return new Format.Builder()
               .setSampleMimeType(MimeTypes.AUDIO_AC3)
               .setChannelCount(decoder.getChannelCount())

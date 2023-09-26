@@ -69,7 +69,8 @@ import java.util.List;
     outputBufferSize = outputFloat ? OUTPUT_BUFFER_SIZE_32BIT : OUTPUT_BUFFER_SIZE_16BIT;
     nativeContext =
             ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount,
-                    FfmpegAudioRenderer.shouldUseTranscodingToAc3(codecName, format.channelCount));
+                    FfmpegAudioRenderer.shouldUseTranscodingToAc3(codecName, format.channelCount)
+                            && supportsBypass);
     this.supportsBypass = supportsBypass;
     if (nativeContext == 0) {
       throw new FfmpegDecoderException("Initialization failed.");

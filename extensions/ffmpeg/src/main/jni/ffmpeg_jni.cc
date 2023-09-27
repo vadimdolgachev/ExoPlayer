@@ -17,6 +17,8 @@
 #include <jni.h>
 #include <stdlib.h>
 
+#include <algorithm>
+
 extern "C" {
 #ifdef __cplusplus
 #define __STDC_CONSTANT_MACROS
@@ -30,6 +32,7 @@ extern "C" {
 #include <libavutil/error.h>
 #include <libavutil/opt.h>
 #include <libswresample/swresample.h>
+#include <libavutil/audio_fifo.h>
 }
 
 #define LOG_TAG "ffmpeg_jni"
@@ -65,6 +68,10 @@ static const AVSampleFormat OUTPUT_FORMAT_PCM_FLOAT = AV_SAMPLE_FMT_FLT;
 
 static const int AUDIO_DECODER_ERROR_INVALID_DATA = -1;
 static const int AUDIO_DECODER_ERROR_OTHER = -2;
+
+static AVCodecContext *ac3CodecCxt = nullptr;
+static AVAudioFifo *audioFifo = nullptr;
+static bool shouldUseTranscodingToAc3 = false;
 
 /**
  * Returns the AVCodec with the specified name, or NULL if it is not available.
@@ -126,7 +133,9 @@ LIBRARY_FUNC(jboolean, ffmpegHasDecoder, jstring codecName) {
 
 AUDIO_DECODER_FUNC(jlong, ffmpegInitialize, jstring codecName,
                    jbyteArray extraData, jboolean outputFloat,
-                   jint rawSampleRate, jint rawChannelCount) {
+                   jint rawSampleRate, jint rawChannelCount,
+                   jboolean transodToAc3) {
+  shouldUseTranscodingToAc3 = transodToAc3;
   AVCodec *codec = getCodecByName(env, codecName);
   if (!codec) {
     LOGE("Codec not found.");
@@ -181,6 +190,9 @@ AUDIO_DECODER_FUNC(jint, ffmpegGetSampleRate, jlong context) {
 }
 
 AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
+  if (audioFifo != nullptr) {
+    av_audio_fifo_reset(audioFifo);
+  }
   AVCodecContext *context = (AVCodecContext *)jContext;
   if (!context) {
     LOGE("Tried to reset without a context.");
@@ -209,6 +221,13 @@ AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
 }
 
 AUDIO_DECODER_FUNC(void, ffmpegRelease, jlong context) {
+  if (audioFifo != nullptr) {
+    av_audio_fifo_free(audioFifo);
+    audioFifo = nullptr;
+  }
+  if (ac3CodecCxt != nullptr) {
+    avcodec_free_context(&ac3CodecCxt);
+  }
   if (context) {
     releaseContext((AVCodecContext *)context);
   }
@@ -234,6 +253,23 @@ AVCodecContext *createContext(JNIEnv *env, AVCodec *codec, jbyteArray extraData,
   }
   context->request_sample_fmt =
       outputFloat ? OUTPUT_FORMAT_PCM_FLOAT : OUTPUT_FORMAT_PCM_16BIT;
+  if (shouldUseTranscodingToAc3) {
+    AVCodec *ac3Codec = avcodec_find_encoder(AV_CODEC_ID_AC3);
+    if (ac3Codec != nullptr && ac3Codec->sample_fmts != nullptr) {
+      ac3CodecCxt = avcodec_alloc_context3(ac3Codec);
+      ac3CodecCxt->sample_fmt = ac3Codec->sample_fmts[0];
+      ac3CodecCxt->sample_rate = rawSampleRate;
+      ac3CodecCxt->channels = rawChannelCount;
+      ac3CodecCxt->channel_layout = av_get_default_channel_layout(rawChannelCount);
+      context->request_sample_fmt = ac3CodecCxt->sample_fmt;
+      int result = avcodec_open2(ac3CodecCxt, ac3Codec, nullptr);
+      if (result < 0) {
+        logError("avcodec_open2", result);
+        avcodec_free_context(&ac3CodecCxt);
+      }
+    }
+  }
+
   if (extraData) {
     jsize size = env->GetArrayLength(extraData);
     context->extradata_size = size;
@@ -271,7 +307,7 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
     logError("avcodec_send_packet", result);
     return transformError(result);
   }
-
+  uint8_t **pcmBuffer = nullptr;
   // Dequeue output data until it runs out.
   int outSize = 0;
   while (true) {
@@ -329,8 +365,20 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
       av_frame_free(&frame);
       return AUDIO_DECODER_ERROR_INVALID_DATA;
     }
-    result = swr_convert(resampleContext, &outputBuffer, bufferOutSize,
-                         (const uint8_t **)frame->data, frame->nb_samples);
+
+    if (shouldUseTranscodingToAc3) {
+      av_samples_alloc_array_and_samples(&pcmBuffer,
+                                         nullptr,
+                                         channelCount,
+                                         outSamples,
+                                         context->request_sample_fmt,
+                                         0);
+      result = swr_convert(resampleContext, pcmBuffer, bufferOutSize,
+                           (const uint8_t **)frame->data, frame->nb_samples);
+    } else {
+      result = swr_convert(resampleContext, &outputBuffer, bufferOutSize,
+                           (const uint8_t **)frame->data, frame->nb_samples);
+    }
     av_frame_free(&frame);
     if (result < 0) {
       logError("swr_convert", result);
@@ -342,8 +390,60 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
            available);
       return AUDIO_DECODER_ERROR_INVALID_DATA;
     }
-    outputBuffer += bufferOutSize;
+
+    if (shouldUseTranscodingToAc3) {
+      if (audioFifo == nullptr) {
+        audioFifo = av_audio_fifo_alloc(context->request_sample_fmt,
+                                        context->channels,
+                                        outSamples);
+      }
+      // TODO: when is need call?
+//      av_audio_fifo_realloc(audioFifo, outSamples);
+      if (av_audio_fifo_write(audioFifo,
+                              reinterpret_cast<void **>(pcmBuffer),
+                              outSamples) <= 0) {
+        LOGE("Could not write data to FIFO\n");
+      }
+    } else {
+      outputBuffer += bufferOutSize;
+    }
     outSize += bufferOutSize;
+  }
+  AVFrame *ac3Frame = nullptr;
+  AVPacket *ac3Packet = nullptr;
+  if (shouldUseTranscodingToAc3 && audioFifo != nullptr) {
+    ac3Frame = av_frame_alloc();
+    ac3Frame->nb_samples = ac3CodecCxt->frame_size;
+    ac3Frame->channels = ac3CodecCxt->channels;
+    ac3Frame->channel_layout = ac3CodecCxt->channel_layout;
+    ac3Frame->format = ac3CodecCxt->sample_fmt;
+    ac3Frame->sample_rate = ac3CodecCxt->sample_rate;
+    av_frame_get_buffer(ac3Frame, 0);
+
+    ac3Packet = av_packet_alloc();
+
+    outSize = 0;
+    int fifoSize = av_audio_fifo_size(audioFifo);
+    while (fifoSize >= ac3CodecCxt->frame_size) {
+      const int frameSize = std::min(fifoSize, ac3CodecCxt->frame_size);
+      av_audio_fifo_read(audioFifo, reinterpret_cast<void **>(ac3Frame->data), frameSize);
+      avcodec_send_frame(ac3CodecCxt, ac3Frame);
+      avcodec_receive_packet(ac3CodecCxt, ac3Packet);
+      memcpy(outputBuffer, ac3Packet->data, ac3Packet->size);
+      outputBuffer += ac3Packet->size;
+      outSize += ac3Packet->size;
+      fifoSize = av_audio_fifo_size(audioFifo);
+    }
+  }
+  if (ac3Packet != nullptr) {
+    av_packet_free(&ac3Packet);
+  }
+  if (ac3Frame != nullptr) {
+    av_frame_free(&ac3Frame);
+  }
+  if (pcmBuffer != nullptr) {
+    av_freep(&pcmBuffer[0]);
+    av_freep(&pcmBuffer);
   }
   return outSize;
 }

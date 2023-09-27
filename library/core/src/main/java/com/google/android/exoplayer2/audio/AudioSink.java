@@ -298,6 +298,8 @@ public interface AudioSink {
    */
   boolean supportsFormat(Format format);
 
+  boolean isSurroundSoundEnabled();
+
   /**
    * Returns the level of support that the sink provides for a given {@link Format}.
    *

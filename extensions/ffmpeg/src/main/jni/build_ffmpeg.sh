@@ -38,6 +38,7 @@ COMMON_OPTIONS="
     --disable-avresample
     --enable-swresample
     --extra-ldexeflags=-pie
+    --enable-encoder=ac3
     "
 TOOLCHAIN_PREFIX="${NDK_PATH}/toolchains/llvm/prebuilt/${HOST_PLATFORM}/bin"
 for decoder in "${ENABLED_DECODERS[@]}"

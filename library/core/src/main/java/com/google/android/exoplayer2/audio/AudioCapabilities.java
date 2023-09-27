@@ -59,6 +59,16 @@ public final class AudioCapabilities {
           },
           DEFAULT_MAX_CHANNEL_COUNT);
 
+
+  /** Audio capabilities when the device specifies external surround sound. */
+  @SuppressWarnings("InlinedApi")
+  private static final AudioCapabilities ENCODED_SURROUND_OUTPUT_CAPABILITIES =
+          new AudioCapabilities(
+                  new int[] {
+                          AudioFormat.ENCODING_PCM_16BIT, AudioFormat.ENCODING_AC3, AudioFormat.ENCODING_E_AC3
+                  },
+                  DEFAULT_MAX_CHANNEL_COUNT, true);
+
   /**
    * All surround sound encodings that a device may be capable of playing mapped to a maximum
    * channel count.
@@ -76,6 +86,8 @@ public final class AudioCapabilities {
 
   /** Global settings key for devices that can specify external surround sound. */
   private static final String EXTERNAL_SURROUND_SOUND_KEY = "external_surround_sound_enabled";
+  public static final String ENCODED_SURROUND_OUTPUT_KEY = "encoded_surround_output";
+  private boolean isSurroundSoundEnabled;
 
   /**
    * Returns the current audio capabilities for the device.
@@ -93,6 +105,10 @@ public final class AudioCapabilities {
 
   @SuppressLint("InlinedApi")
   /* package */ static AudioCapabilities getCapabilities(Context context, @Nullable Intent intent) {
+    if (Global.getInt(context.getContentResolver(), ENCODED_SURROUND_OUTPUT_KEY, 0) == 2) {
+      return ENCODED_SURROUND_OUTPUT_CAPABILITIES;
+    }
+
     if (deviceMaySetExternalSurroundSoundGlobalSetting()
         && Global.getInt(context.getContentResolver(), EXTERNAL_SURROUND_SOUND_KEY, 0) == 1) {
       return EXTERNAL_SURROUND_SOUND_CAPABILITIES;
@@ -140,7 +156,7 @@ public final class AudioCapabilities {
    *     supported.
    * @param maxChannelCount The maximum number of audio channels that can be played simultaneously.
    */
-  public AudioCapabilities(@Nullable int[] supportedEncodings, int maxChannelCount) {
+  public AudioCapabilities(@Nullable int[] supportedEncodings, int maxChannelCount, boolean isSurroundSoundEnabled) {
     if (supportedEncodings != null) {
       this.supportedEncodings = Arrays.copyOf(supportedEncodings, supportedEncodings.length);
       Arrays.sort(this.supportedEncodings);
@@ -148,6 +164,11 @@ public final class AudioCapabilities {
       this.supportedEncodings = new int[0];
     }
     this.maxChannelCount = maxChannelCount;
+    this.isSurroundSoundEnabled = isSurroundSoundEnabled;
+  }
+
+  public AudioCapabilities(@Nullable int[] supportedEncodings, int maxChannelCount) {
+    this(supportedEncodings, maxChannelCount, false);
   }
 
   /**
@@ -288,6 +309,10 @@ public final class AudioCapabilities {
     }
 
     return Util.getAudioTrackChannelConfig(channelCount);
+  }
+
+  public boolean isSurroundSoundEnabled() {
+    return isSurroundSoundEnabled;
   }
 
   @RequiresApi(29)

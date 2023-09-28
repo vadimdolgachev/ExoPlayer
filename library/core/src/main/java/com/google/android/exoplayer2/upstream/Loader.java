@@ -22,6 +22,7 @@ import android.annotation.SuppressLint;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.os.SystemClock;
 import androidx.annotation.IntDef;
 import androidx.annotation.Nullable;
@@ -40,6 +41,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Manages the background loading of {@link Loadable}s. */
 public final class Loader implements LoaderErrorThrower {
+
+  private final int threadPriority;
 
   /** Thrown when an unexpected exception or error is encountered during loading. */
   public static final class UnexpectedLoaderException extends IOException {
@@ -205,6 +208,11 @@ public final class Loader implements LoaderErrorThrower {
    *     component using the loader.
    */
   public Loader(String threadNameSuffix) {
+    this(threadNameSuffix, Process.THREAD_PRIORITY_DEFAULT);
+  }
+
+  public Loader(String threadNameSuffix, int threadPriority) {
+    this.threadPriority = threadPriority;
     this.downloadExecutorService =
         Util.newSingleThreadExecutor(THREAD_NAME_PREFIX + threadNameSuffix);
   }
@@ -254,7 +262,7 @@ public final class Loader implements LoaderErrorThrower {
     Looper looper = Assertions.checkStateNotNull(Looper.myLooper());
     fatalError = null;
     long startTimeMs = SystemClock.elapsedRealtime();
-    new LoadTask<>(looper, loadable, callback, defaultMinRetryCount, startTimeMs).start(0);
+    new LoadTask<>(looper, loadable, callback, defaultMinRetryCount, startTimeMs, threadPriority).start(0);
     return startTimeMs;
   }
 
@@ -334,18 +342,21 @@ public final class Loader implements LoaderErrorThrower {
     @Nullable private Thread executorThread;
     private boolean canceled;
     private volatile boolean released;
+    private final int threadPriority;
 
     public LoadTask(
         Looper looper,
         T loadable,
         Loader.Callback<T> callback,
         int defaultMinRetryCount,
-        long startTimeMs) {
+        long startTimeMs,
+        int threadPriority) {
       super(looper);
       this.loadable = loadable;
       this.callback = callback;
       this.defaultMinRetryCount = defaultMinRetryCount;
       this.startTimeMs = startTimeMs;
+      this.threadPriority = threadPriority;
     }
 
     public void maybeThrowError(int minRetryCount) throws IOException {
@@ -406,6 +417,8 @@ public final class Loader implements LoaderErrorThrower {
           shouldLoad = !canceled;
           executorThread = Thread.currentThread();
         }
+        Process.setThreadPriority(threadPriority);
+
         if (shouldLoad) {
           TraceUtil.beginSection("load:" + loadable.getClass().getSimpleName());
           try {

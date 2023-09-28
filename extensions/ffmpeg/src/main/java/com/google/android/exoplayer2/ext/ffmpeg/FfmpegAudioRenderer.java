@@ -117,7 +117,8 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
         format.maxInputSize != Format.NO_VALUE ? format.maxInputSize : DEFAULT_INPUT_BUFFER_SIZE;
     FfmpegAudioDecoder decoder =
         new FfmpegAudioDecoder(
-            format, NUM_BUFFERS, NUM_BUFFERS, initialInputBufferSize, shouldOutputFloat(format));
+            format, NUM_BUFFERS, NUM_BUFFERS, initialInputBufferSize, shouldOutputFloat(format),
+                supportsBypass(format), isSurroundSoundEnabled());
     TraceUtil.endSection();
     return decoder;
   }
@@ -126,12 +127,7 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   @Override
   protected Format getOutputFormat(FfmpegAudioDecoder decoder) {
     Assertions.checkNotNull(decoder);
-    return new Format.Builder()
-        .setSampleMimeType(MimeTypes.AUDIO_RAW)
-        .setChannelCount(decoder.getChannelCount())
-        .setSampleRate(decoder.getSampleRate())
-        .setPcmEncoding(decoder.getEncoding())
-        .build();
+    return decoder.getOutputFormat();
   }
 
   /**

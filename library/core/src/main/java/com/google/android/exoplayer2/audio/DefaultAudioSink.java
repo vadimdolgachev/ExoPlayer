@@ -679,6 +679,10 @@ public final class DefaultAudioSink implements AudioSink {
     return SINK_FORMAT_UNSUPPORTED;
   }
 
+  public boolean isSurroundSoundEnabled() {
+    return audioCapabilities.isSurroundSoundEnabled();
+  }
+
   @Override
   public long getCurrentPositionUs(boolean sourceEnded) {
     if (!isAudioTrackInitialized() || startMediaTimeUsNeedsInit) {

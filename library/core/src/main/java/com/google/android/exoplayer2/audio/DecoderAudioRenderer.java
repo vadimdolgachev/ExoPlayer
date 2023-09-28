@@ -232,6 +232,14 @@ public abstract class DecoderAudioRenderer<
     this.experimentalKeepAudioTrackOnSeek = enableKeepAudioTrackOnSeek;
   }
 
+  public boolean supportsBypass(Format format) {
+    return audioSink.supportsFormat(format);
+  }
+
+  public boolean isSurroundSoundEnabled() {
+    return audioSink.isSurroundSoundEnabled();
+  }
+
   @Override
   @Nullable
   public MediaClock getMediaClock() {

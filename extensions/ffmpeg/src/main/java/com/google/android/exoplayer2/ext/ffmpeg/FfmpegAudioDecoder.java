@@ -43,7 +43,9 @@ import java.util.List;
   @Nullable private final byte[] extraData;
   private final @C.PcmEncoding int encoding;
   private final int outputBufferSize;
-
+  private final boolean supportsBypass;
+  private final boolean surroundSoundEnabled;
+  private final Format inputFormat;
   private long nativeContext; // May be reassigned on resetting the codec.
   private boolean hasOutputFormat;
   private volatile int channelCount;
@@ -54,19 +56,25 @@ import java.util.List;
       int numInputBuffers,
       int numOutputBuffers,
       int initialInputBufferSize,
-      boolean outputFloat)
+      boolean outputFloat,
+      boolean supportsBypass,
+      boolean surroundSoundEnabled)
       throws FfmpegDecoderException {
     super(new DecoderInputBuffer[numInputBuffers], new SimpleDecoderOutputBuffer[numOutputBuffers]);
     if (!FfmpegLibrary.isAvailable()) {
       throw new FfmpegDecoderException("Failed to load decoder native libraries.");
     }
     Assertions.checkNotNull(format.sampleMimeType);
+    inputFormat = format;
     codecName = Assertions.checkNotNull(FfmpegLibrary.getCodecName(format.sampleMimeType));
     extraData = getExtraData(format.sampleMimeType, format.initializationData);
     encoding = outputFloat ? C.ENCODING_PCM_FLOAT : C.ENCODING_PCM_16BIT;
     outputBufferSize = outputFloat ? OUTPUT_BUFFER_SIZE_32BIT : OUTPUT_BUFFER_SIZE_16BIT;
     nativeContext =
-        ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount);
+            ffmpegInitialize(codecName, extraData, outputFloat, format.sampleRate, format.channelCount,
+                    shouldUseTranscodingToAc3(codecName, format.channelCount) && surroundSoundEnabled);
+    this.supportsBypass = supportsBypass;
+    this.surroundSoundEnabled = surroundSoundEnabled;
     if (nativeContext == 0) {
       throw new FfmpegDecoderException("Initialization failed.");
     }
@@ -108,7 +116,14 @@ import java.util.List;
     ByteBuffer inputData = Util.castNonNull(inputBuffer.data);
     int inputSize = inputData.limit();
     ByteBuffer outputData = outputBuffer.init(inputBuffer.timeUs, outputBufferSize);
-    int result = ffmpegDecode(nativeContext, inputData, inputSize, outputData, outputBufferSize);
+    int result;
+
+    if (supportsBypass && surroundSoundEnabled) {
+      outputData.put(inputData);
+      result = inputSize;
+    } else {
+      result = ffmpegDecode(nativeContext, inputData, inputSize, outputData, outputBufferSize);
+    }
     if (result == AUDIO_DECODER_ERROR_OTHER) {
       return new FfmpegDecoderException("Error decoding (see logcat).");
     } else if (result == AUDIO_DECODER_ERROR_INVALID_DATA) {
@@ -218,7 +233,8 @@ import java.util.List;
       @Nullable byte[] extraData,
       boolean outputFloat,
       int rawSampleRate,
-      int rawChannelCount);
+      int rawChannelCount,
+      boolean shouldUseTranscodingToAc3);
 
   private native int ffmpegDecode(
       long context, ByteBuffer inputData, int inputSize, ByteBuffer outputData, int outputSize);
@@ -230,4 +246,28 @@ import java.util.List;
   private native long ffmpegReset(long context, @Nullable byte[] extraData);
 
   private native void ffmpegRelease(long context);
+
+  public Format getOutputFormat() {
+    if (surroundSoundEnabled
+            && (shouldUseTranscodingToAc3(
+                    Assertions.checkNotNull(FfmpegLibrary.getCodecName(inputFormat.sampleMimeType)),
+            inputFormat.channelCount) || supportsBypass)) {
+      return new Format.Builder()
+              .setSampleMimeType(MimeTypes.AUDIO_AC3)
+              .setChannelCount(inputFormat.channelCount)
+              .setSampleRate(inputFormat.sampleRate)
+              .build();
+    } else {
+      return new Format.Builder()
+              .setSampleMimeType(MimeTypes.AUDIO_RAW)
+              .setChannelCount(getChannelCount())
+              .setSampleRate(getSampleRate())
+              .setPcmEncoding(getEncoding())
+              .build();
+    }
+  }
+
+  private static boolean shouldUseTranscodingToAc3(String codecName, int channelCount) {
+    return "aac".equals(codecName) && channelCount >= 6;
+  }
 }

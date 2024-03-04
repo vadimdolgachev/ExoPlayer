@@ -134,8 +134,8 @@ LIBRARY_FUNC(jboolean, ffmpegHasDecoder, jstring codecName) {
 AUDIO_DECODER_FUNC(jlong, ffmpegInitialize, jstring codecName,
                    jbyteArray extraData, jboolean outputFloat,
                    jint rawSampleRate, jint rawChannelCount,
-                   jboolean transodToAc3) {
-  shouldUseTranscodingToAc3 = transodToAc3;
+                   jboolean transcodingToAc3) {
+  shouldUseTranscodingToAc3 = transcodingToAc3;
   AVCodec *codec = getCodecByName(env, codecName);
   if (!codec) {
     LOGE("Codec not found.");
@@ -411,7 +411,7 @@ int decodePacket(AVCodecContext *context, AVPacket *packet,
   }
   AVFrame *ac3Frame = nullptr;
   AVPacket *ac3Packet = nullptr;
-  if (shouldUseTranscodingToAc3 && audioFifo != nullptr) {
+  if (shouldUseTranscodingToAc3 && audioFifo != nullptr && ac3CodecCxt != nullptr) {
     ac3Frame = av_frame_alloc();
     ac3Frame->nb_samples = ac3CodecCxt->frame_size;
     ac3Frame->channels = ac3CodecCxt->channels;

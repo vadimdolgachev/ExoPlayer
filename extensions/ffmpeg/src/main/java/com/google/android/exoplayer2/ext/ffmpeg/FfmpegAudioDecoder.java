@@ -268,6 +268,7 @@ import java.util.List;
   }
 
   private static boolean shouldUseTranscodingToAc3(String codecName, int channelCount) {
-    return "aac".equals(codecName) && channelCount >= 6;
+    // Transcoding in AC3 only for AAC 5.1 configuration
+    return "aac".equals(codecName) && channelCount == 6;
   }
 }

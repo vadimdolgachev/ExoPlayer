@@ -103,8 +103,14 @@ public final class AudioCapabilities {
 
   @SuppressLint("InlinedApi")
   /* package */ static AudioCapabilities getCapabilities(Context context, @Nullable Intent intent) {
-    if (("Amlogic".equals(Util.MANUFACTURER) || ("Xiaomi".equals(Util.MANUFACTURER))
-        && Global.getInt(context.getContentResolver(), ENCODED_SURROUND_OUTPUT_KEY, 0) == 2)) {
+    if (("Amlogic".equals(Util.MANUFACTURER)
+            || "Xiaomi".equals(Util.MANUFACTURER))
+            && Global.getInt(context.getContentResolver(), ENCODED_SURROUND_OUTPUT_KEY, 0) == 2) {
+      return ENCODED_SURROUND_OUTPUT_CAPABILITIES;
+    }
+    if ("Eltex".equals(Util.MANUFACTURER)
+            && "NV730WB".equals(Util.MODEL)
+            && Global.getInt(context.getContentResolver(), ENCODED_SURROUND_OUTPUT_KEY, 0) == 0) {
       return ENCODED_SURROUND_OUTPUT_CAPABILITIES;
     }
 

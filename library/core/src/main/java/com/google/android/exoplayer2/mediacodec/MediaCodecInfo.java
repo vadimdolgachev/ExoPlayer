@@ -882,7 +882,8 @@ public final class MediaCodecInfo {
         /* Lenovo Tablet M10 FHD Plus */
         || Util.MODEL.startsWith("Lenovo TB-X605")
         || Util.MODEL.startsWith("Lenovo TB-X606")
-        || Util.MODEL.startsWith("Lenovo TB-X616");
+        || Util.MODEL.startsWith("Lenovo TB-X616")
+        || "NV730WB".equals(Util.MODEL);
   }
 
   /** Possible outcomes of evaluating PerformancePoint coverage */

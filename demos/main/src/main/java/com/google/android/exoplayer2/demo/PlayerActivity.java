@@ -17,6 +17,7 @@ package com.google.android.exoplayer2.demo;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Pair;
@@ -37,6 +38,7 @@ import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.Tracks;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.demo.extractor.AviExtractorsFactory;
 import com.google.android.exoplayer2.drm.DefaultDrmSessionManagerProvider;
 import com.google.android.exoplayer2.drm.FrameworkMediaDrm;
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader;
@@ -271,7 +273,7 @@ public class PlayerActivity extends AppCompatActivity
       lastSeenTracks = Tracks.EMPTY;
       ExoPlayer.Builder playerBuilder =
           new ExoPlayer.Builder(/* context= */ this)
-              .setMediaSourceFactory(createMediaSourceFactory());
+              .setMediaSourceFactory(createMediaSourceFactory(intent));
       setRenderersFactory(
           playerBuilder, intent.getBooleanExtra(IntentUtil.PREFER_EXTENSION_DECODERS_EXTRA, false));
       player = playerBuilder.build();
@@ -295,7 +297,7 @@ public class PlayerActivity extends AppCompatActivity
     return true;
   }
 
-  private MediaSource.Factory createMediaSourceFactory() {
+  private MediaSource.Factory createMediaSourceFactory(Intent intent) {
     DefaultDrmSessionManagerProvider drmSessionManagerProvider =
         new DefaultDrmSessionManagerProvider();
     drmSessionManagerProvider.setDrmHttpDataSourceFactory(
@@ -311,6 +313,12 @@ public class PlayerActivity extends AppCompatActivity
             serverSideAdsLoader,
             new DefaultMediaSourceFactory(/* context= */ this)
                 .setDataSourceFactory(dataSourceFactory));
+
+    Uri uri = Uri.parse(intent.getDataString());
+    if (uri.toString().endsWith(".avi")) {
+      return new DefaultMediaSourceFactory(getApplicationContext(), new AviExtractorsFactory())
+          .setDataSourceFactory(dataSourceFactory);
+    }
     return new DefaultMediaSourceFactory(/* context= */ this)
         .setDataSourceFactory(dataSourceFactory)
         .setDrmSessionManagerProvider(drmSessionManagerProvider)

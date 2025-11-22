@@ -635,6 +635,14 @@
     "name": "Misc",
     "samples": [
       {
+        "name": "37NBBYIWKROIAH6EG6E6KDKDECQZZ3ZJ25QBNVA",
+        "uri": "http://192.168.0.107:9000/37NBBYIWKROIAH6EG6E6KDKDECQZZ3ZJ25QBNVA.avi"
+      },
+      {
+        "name": "scrubs.s01e01.dvdrip.rus.eng.novafilm.tv",
+        "uri": "http://192.168.0.107:9000/scrubs.s01e01.dvdrip.rus.eng.novafilm.tv.avi"
+      },
+      {
         "name": "Dizzy (MP4)",
         "uri": "https://html5demos.com/assets/dizzy.mp4"
       },

@@ -50,9 +50,9 @@ public abstract class NalStreamHandler extends VideoStreamHandler {
     @Override
     public void seekPosition(long position) {
         super.seekPosition(position);
-        if (useStreamClock) {
-            reset();
-        }
+        // Always reset stream clock state on seek, regardless of useStreamClock
+        // This ensures timestamps start fresh after seek
+        reset();
     }
 
     abstract void processChunk(ExtractorInput input, int nalTypeOffset) throws IOException;
